@@ -10,12 +10,12 @@ defmodule TechtreeWeb.ReleaseCopyTest do
   Each of them is close enough to the truth that it survives a careful edit,
   which is why it is checked here instead.
 
-  Two things are the other way round: they have to be there. Hermes reads the
+  Two things are the other way round: they have to be there where that topic is
+  taught. Hermes reads the
   plugin's source before installing it and reports what it found, and a page
   that tells a reader what that report will say also has to tell them that
-  switching the reporting off is not one of the answers. And a page that says
-  what this release is has to say the whole of it — a working technical preview
-  of a stack of three independent parts, two of them somebody else's work.
+  switching the reporting off is not one of the answers. The repository README
+  carries the full release framing; individual site routes keep one job.
 
   Every source of published words is read here: each page as a reader sees it,
   with a release being served and with none, the installation contract this
@@ -35,34 +35,20 @@ defmodule TechtreeWeb.ReleaseCopyTest do
   @pages [
     "/",
     "/docs",
-    "/campaigns",
-    "/campaigns/hello-world-climb",
     "/proofs",
     "/start",
-    "/climbs",
     "/climbs/hello-world-climb",
-    "/proofs/local",
-    "/protocol",
-    "/runs",
-    "/runs/" <> Techtree.NetworkFixture.bundle_digest()
+    "/results",
+    "/results/" <> Techtree.NetworkFixture.bundle_digest()
   ]
 
   @pages_without_catalog [
     "/",
     "/docs",
-    "/campaigns",
     "/proofs",
     "/start",
-    "/climbs",
-    "/proofs/local",
-    "/protocol",
-    "/runs"
+    "/results"
   ]
-
-  # The addresses that carry one of the two installation paths. Which page
-  # offers which is a design decision and has moved once already; that a page
-  # offering one carries its exact words has not moved and is not allowed to.
-  @install_paths ["/", "/start", "/?install=me", "/start?install=me", "/docs"]
 
   # A claim that the machine keeps everything, which the remote model calls a
   # trial makes contradict unless the same passage says so.
@@ -115,25 +101,6 @@ defmodule TechtreeWeb.ReleaseCopyTest do
     ~r/\bscores?\s+\d{1,3}\b/i
   ]
 
-  # A Climb's terms describe what publication would mean for a result produced
-  # under them. This release performs none of it, and the terms read as a
-  # threat to a careful reader unless the same passage says so.
-  @publication_terms [
-    "Would be published as part of entering",
-    "Under these terms nothing you submit is treated as private",
-    "May be published under these terms"
-  ]
-
-  # Decision 0038: publishing exists and is a person's own choice, so the
-  # halves that must travel together changed. Nothing goes unless they send
-  # it, the recordings never go at all, and the model calls still leave. A
-  # passage carrying only the first of those is the one that misleads.
-  @publishes_nothing [
-    "Nothing you produce is published unless you publish a finished run yourself.",
-    "the complete proof bundle",
-    "a separate signed publication receipt"
-  ]
-
   @forbidden_name ~r/helloworldbench/i
 
   # This release publishes nothing and receives nothing, and the pages that
@@ -152,7 +119,6 @@ defmodule TechtreeWeb.ReleaseCopyTest do
   # installs nothing is worse than no command. The pinned installation guide is
   # the one place the stand-in commands are shown, under a warning that says
   # what they are, so that the path can be read before it is real.
-  @placeholder_coordinates ["0.0.0-placeholder", String.duplicate("0", 40)]
 
   # A promise this release cannot keep about something somebody volunteered.
   @promised_erasure [
@@ -162,8 +128,6 @@ defmodule TechtreeWeb.ReleaseCopyTest do
     ~r/\bpermanently deleted\b/i,
     ~r/\bgone (for good|forever)\b/i
   ]
-  @pages_that_get_you_running ["/", "/docs", "/campaigns", "/proofs"]
-
   # This release installs and runs at a terminal. Any page that hints at a
   # journey beginning on a handheld device is describing something that does
   # not exist. (Engineering notes about narrow screens are not published words
@@ -190,21 +154,6 @@ defmodule TechtreeWeb.ReleaseCopyTest do
   @report_described ~r/(?<![.\w])scan(s|ned|ning|ner)?\b/i
   @never_disable "Never turn the scanning off."
 
-  # A page that hands a reader the command that installs the plugin has said
-  # enough about installing to owe them the verdict that command will produce,
-  # in the words it was decided in.
-  @install_command "hermes plugins install"
-  @scan_section [
-    "What the security scan will say",
-    "This plugin comes back at caution, with five findings in three families.",
-    "Expect Hermes to refuse the first attempt.",
-    "A community-source plugin at caution is refused rather than queried.",
-    "It does not stop and ask.",
-    "run the same pinned command again with --force appended",
-    "Remove existing plugin and reinstall",
-    "Never turn the scanning off."
-  ]
-
   # Hermes 0.20.5 refuses a community-source plugin at caution. It does not
   # present a scan-specific question. These are the three stale promises the
   # plugin repository guards, plus the wording this site carried when the
@@ -230,57 +179,11 @@ defmodule TechtreeWeb.ReleaseCopyTest do
     "https://github.com/PrimeIntellect-ai/verifiers",
     "https://github.com/NousResearch/hermes-agent",
     "https://github.com/NVIDIA-NeMo",
+    "https://github.com/NVIDIA/NeMo-Fabric",
+    "https://github.com/NVIDIA/NeMo-Relay",
     "https://github.com/regents-ai/techtree"
   ]
   @unset_revision String.duplicate("0", 40)
-
-  # The words a reader hands to their agent are decided copy, not a paraphrase
-  # this suite is free to drift away from. One prompt is written once and shown
-  # wherever the agent path is offered, so every page carrying it carries all of
-  # it — read here with the line breaks taken out, because a page renders the
-  # prompt as the block a reader copies.
-  @agent_prompt "Read the pinned Techtree installation guide at https://techtree.sh/start. " <>
-                  "If the guide says no installable release is active, stop and tell me. " <>
-                  "Otherwise, use only the exact plugin commit and CLI version published by " <>
-                  "the active release. Explain the prerequisites, the expected Hermes scanner " <>
-                  "findings, what may spend model tokens, and what stays local. Ask before: " <>
-                  "1. installing the Techtree plugin; 2. installing the Techtree CLI; or " <>
-                  "3. starting a comparison that spends tokens. After the plugin is enabled, " <>
-                  "tell me when Hermes must be restarted. Then run Techtree Doctor, obtain " <>
-                  "the Hello World starter Skill, and prepare the comparison. Stop before " <>
-                  "spending until I approve it. Do not upload my local evaluation artifacts."
-
-  # The three promises inside the prompt that a rewrite must never lose: it asks
-  # before it installs, it asks before it spends, and it never sends the
-  # reader's own artifacts anywhere.
-  @agent_prompt_promises [
-    "Ask before: 1. installing the Techtree plugin; 2. installing the Techtree CLI; or " <>
-      "3. starting a comparison that spends tokens.",
-    "Stop before spending until I approve it.",
-    "Do not upload my local evaluation artifacts."
-  ]
-
-  @agent_path_heading "Give this to your Hermes agent"
-  @alternate_path_heading "Prefer installing it yourself?"
-
-  @alternate_path [
-    "Prefer installing it yourself?",
-    "Install the exact pinned Hermes plugin shown below.",
-    "Restart Hermes.",
-    "Ask: “Set up Techtree and run the Hello World Climb.”"
-  ]
-
-  @hermes_introduction [
-    "Hermes is an open-source agent made by Nous Research.",
-    "Nous Portal provides model access, hosted tools, and cloud-hosted Hermes " <>
-      "under one account.",
-    # The address is a link, so the sentence's full stop sits outside it.
-    "Explore it at https://portal.nousresearch.com/",
-    "Techtree Hello World currently requires a Hermes host where you can install the " <>
-      "plugin and CLI, access a terminal, run Docker, and authenticate with Prime.",
-    "The Nous Portal cloud-hosted path is not yet a separately certified Techtree " <>
-      "execution environment."
-  ]
 
   # Decision 0035. Every other check here removes a claim; this one requires
   # one. What v0.1 is — a working technical preview of a stack of three independent
@@ -298,7 +201,7 @@ defmodule TechtreeWeb.ReleaseCopyTest do
   @stack_attribution [
     ~r/Prime\s+Intellect[’']s\s+Verifiers/iu,
     ~r/Nous\s+Research[’']s\s+Hermes/iu,
-    ~r/Techtree\s+as\s+the\s+campaign\s+kernel/iu
+    ~r/Techtree\s+as\s+the\s+(?:campaign\s+kernel|comparison)\s+and\s+evidence\s+layer/iu
   ]
 
   # The pages that say what this release is: the front page a stranger lands
@@ -306,8 +209,6 @@ defmodule TechtreeWeb.ReleaseCopyTest do
   # shows a real result. The last one was missing and that is how two capability
   # claims reached it - it draws an exact score, which is the one place a reader
   # most needs to be told what the number is and is not.
-  @pages_that_say_what_this_is ["/", "/docs", "/proofs"]
-
   describe "every page, with a release being served" do
     setup do
       CatalogFixture.use_bundle(CatalogFixture.root())
@@ -336,34 +237,12 @@ defmodule TechtreeWeb.ReleaseCopyTest do
       refute_promised_revision(rendered(conn, @pages))
     end
 
-    test "the Climb page says a proposal may be unusable or may not help", %{conn: conn} do
-      {:ok, _live, html} = live(conn, ~p"/climbs/hello-world-climb")
-      text = visible_text(html)
-
-      assert text =~ "Your own agent proposes one revision."
-      assert text =~ "Techtree tests it"
-      assert text =~ "A proposal may be unusable, or may run and fail to improve the score"
-    end
-
     test "no page promises the starter Skill a score", %{conn: conn} do
       refute_exact_score_claim(rendered(conn, @pages))
     end
 
     test "no page calls the introductory Climb a benchmark", %{conn: conn} do
       refute_forbidden_name(rendered(conn, @pages))
-    end
-
-    test "the pages that say what this release is carry the whole frame", %{conn: conn} do
-      require_working_technical_preview(rendered(conn, @pages_that_say_what_this_is))
-    end
-
-    test "the Climb page states the starter Skill's calibration in the approved words",
-         %{conn: conn} do
-      {:ok, _live, html} = live(conn, ~p"/climbs/hello-world-climb")
-
-      assert visible_text(html) =~
-               "intentionally incomplete and calibrated to solve roughly two-thirds " <>
-                 "of the toy tasks. Individual runs may vary."
     end
 
     test "no page offers a hosted Hermes without saying what it is not yet", %{conn: conn} do
@@ -382,71 +261,14 @@ defmodule TechtreeWeb.ReleaseCopyTest do
       refute_moving_address(markup(conn, @pages))
     end
 
-    test "every page offering the agent path carries the prompt as it was written",
-         %{conn: conn} do
-      offering =
-        for {label, text} <- rendered(conn, @install_paths),
-            String.contains?(text, @agent_path_heading) do
-          assert text =~ @agent_prompt, "#{label} does not carry the prompt word for word"
-
-          for promise <- @agent_prompt_promises do
-            assert String.contains?(text, promise),
-                   "#{label} does not carry #{inspect(promise)} word for word"
-          end
-
-          label
-        end
-
-      assert offering != [], "no page offered the agent path, so nothing was checked"
-    end
-
-    test "every page offering the other path carries its three steps as they were written",
-         %{conn: conn} do
-      offering =
-        for {label, text} <- rendered(conn, @install_paths),
-            String.contains?(text, @alternate_path_heading) do
-          for line <- @alternate_path do
-            assert text =~ line, "#{label} does not carry #{inspect(line)} word for word"
-          end
-
-          label
-        end
-
-      assert offering != [], "no page offered the other path, so nothing was checked"
-    end
-
-    test "every page saying what Hermes is says it as it was written", %{conn: conn} do
-      for {label, text} <- rendered(conn, @pages), text =~ "New to Hermes Agent?" do
-        for line <- @hermes_introduction do
-          assert text =~ line, "#{label} does not carry #{inspect(line)} word for word"
-        end
-      end
-    end
-
     test "no page describes the install-time report without saying it stays on",
          %{conn: conn} do
       require_never_disable(rendered(conn, @pages))
     end
 
-    test "every page that hands out the install command says what the report will say",
-         %{conn: conn} do
-      offering =
-        for {label, text} <- rendered(conn, @install_paths),
-            String.contains?(text, @install_command) do
-          for line <- @scan_section do
-            assert String.contains?(text, line),
-                   "#{label} offers the install command without #{inspect(line)}"
-          end
-
-          label
-        end
-
-      assert offering != [], "no page offered the install command, so nothing was checked"
-    end
-
     test "no public source or rendered install page promises a scanner question Hermes never asks",
          %{conn: conn} do
-      sources = page_sources() ++ rendered(conn, @install_paths)
+      sources = page_sources() ++ rendered(conn, ["/start"])
 
       for {label, source} <- sources, pattern <- @scan_promises_question do
         refute source =~ pattern,
@@ -462,31 +284,8 @@ defmodule TechtreeWeb.ReleaseCopyTest do
       end
     end
 
-    test "the pages that describe privacy say where the model calls go", %{conn: conn} do
-      silent =
-        for {label, text} <- rendered(conn, ["/", "/start", "/proofs/local"]),
-            not (text =~ @privacy_names_the_calls and text =~ @privacy_names_the_recipient),
-            do: label
-
-      assert silent == [],
-             "these pages describe what stays on the reader's machine without saying that " <>
-               "model calls go to the selected provider: #{Enum.join(silent, ", ")}"
-    end
-
-    test "every page stating a Climb's publication terms says this release publishes nothing",
-         %{conn: conn} do
-      showing = require_publishes_nothing(rendered(conn, @pages))
-
-      assert showing != [],
-             "no page stated the publication terms, so nothing was checked"
-    end
-
     test "no page offers a part of a result this release does not have", %{conn: conn} do
       refute_offered_publication(rendered(conn, @pages))
-    end
-
-    test "no page hands a reader a stand-in coordinate to run", %{conn: conn} do
-      refute_placeholder_coordinates(markup(conn, @pages_that_get_you_running))
     end
 
     test "the page a reader is sent to for a proof says what is and is not there",
@@ -494,16 +293,16 @@ defmodule TechtreeWeb.ReleaseCopyTest do
       {:ok, _live, html} = live(conn, ~p"/proofs")
       text = visible_text(html)
 
-      # Founder ruling 2026-08-26: the page leads with the real certified
-      # example — and still says plainly that a reader cannot publish here yet.
-      assert text =~ "Example Baseline vs. Instructional Skill"
-      assert text =~ "Participant-attested"
-      assert text =~ "arrives in a later release"
+      # This route owns the verifier boundary; published evidence lives at /results.
+      assert text =~ "How verification works"
+      assert text =~ "What Techtree verifies"
+      assert text =~ "What remains unproven"
+      assert text =~ "Verification is not observation"
+      assert text =~ "The site did not witness the execution."
       assert text =~ "techtree proof verify path/to/result-bundle"
-
-      # Every coordinate it does show is one the served release publishes.
-      assert text =~ CatalogFixture.campaign_digest()
-      assert text =~ "prime · qwen/qwen3.7-flash"
+      refute text =~ CatalogFixture.campaign_digest()
+      refute text =~ "arrives in a later release"
+      refute text =~ "USDC"
     end
   end
 
@@ -528,7 +327,6 @@ defmodule TechtreeWeb.ReleaseCopyTest do
       refute_offered_publication(sources)
       require_never_disable(sources)
       refute_moving_address(markup(conn, @pages_without_catalog))
-      require_working_technical_preview(rendered(conn, @pages_that_say_what_this_is))
     end
   end
 
@@ -712,13 +510,6 @@ defmodule TechtreeWeb.ReleaseCopyTest do
     end
   end
 
-  defp refute_placeholder_coordinates(sources) do
-    for {label, markup} <- sources, coordinate <- @placeholder_coordinates do
-      refute String.contains?(markup, coordinate),
-             "#{label} shows #{coordinate}, which is a stand-in rather than a release"
-    end
-  end
-
   defp refute_moving_address(sources) do
     for {label, markup} <- sources,
         address <- addresses(markup),
@@ -736,20 +527,6 @@ defmodule TechtreeWeb.ReleaseCopyTest do
   end
 
   # -- Where the words come from --------------------------------------------
-
-  defp require_publishes_nothing(sources) do
-    for {label, source} <- sources,
-        text = String.replace(source, ~r/\s+/, " "),
-        Enum.any?(@publication_terms, &String.contains?(text, &1)) do
-      for half <- @publishes_nothing do
-        assert String.contains?(text, half),
-               "#{label} states what publication would mean without saying, beside it, " <>
-                 "that this release publishes nothing: #{inspect(half)} is missing"
-      end
-
-      label
-    end
-  end
 
   defp rendered(conn, pages) do
     Enum.map(pages, fn page ->

@@ -1,66 +1,81 @@
 defmodule TechtreeWeb.StartLive do
   @moduledoc """
-  Installing Techtree, and the one thing to read before entering a Climb.
-
-  Every command shown here is built from the installation contract the site
-  publishes, never written into the page: what a reader copies is what the
-  release says, or the page says plainly that there is nothing to copy yet.
+  The one instruction for setting up Techtree and starting the introductory Climb.
   """
 
   use TechtreeWeb, :live_view
 
-  alias Techtree.Catalog.Query
-  alias TechtreeWeb.InstallComponents
+  alias TechtreeWeb.ReleaseInfo
+
+  @instruction "Set up Techtree and run the Hello World Climb."
+  @setup_paths "Choose the Techtree CLI or Hermes plugin path below."
+  @approval_boundary "Follow Doctor's exact next action. Ask before starting paid model inference."
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok,
-     socket
-     |> assign(page_title: "Install Techtree")
-     |> assign(instructions: instructions())}
-  end
+    release = ReleaseInfo.current()
 
-  @impl true
-  def handle_params(params, _uri, socket) do
-    {:noreply, assign(socket, focus: InstallComponents.focus(params))}
+    {:ok,
+     assign(socket,
+       page_title: @instruction,
+       instruction: @instruction,
+       setup_paths: @setup_paths,
+       setup_commands: setup_commands(release)
+     )}
   end
 
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.page>
-      <h1>Install Techtree</h1>
-      <p class="lede">
-        The pinned installation guide. Two ways in — pick whichever matches who is at the
-        keyboard.
-      </p>
-
-      <InstallComponents.install focus={@focus} instructions={@instructions} path={~p"/start"} />
-
-      <InstallComponents.requirements instructions={@instructions} />
-
-      <InstallComponents.pinned_commands instructions={@instructions} />
-
-      <InstallComponents.scanning instructions={@instructions} />
-
-      <InstallComponents.disclosure />
-
-      <InstallComponents.hermes_intro />
-
-      <p class="small quiet section">
-        Each Climb states what happens to your recordings and to the work you submit.
-        <a href={~p"/climbs"}>Read the terms of a Climb</a>
-        if you would rather see
-        them before you install anything.
-      </p>
+    <Layouts.page flush>
+      <section class="setup-page" aria-labelledby="setup-instruction">
+        <h1 id="setup-instruction" class="setup-page__instruction">{@instruction}</h1>
+        <p class="setup-page__paths">{@setup_paths}</p>
+        <div :if={@setup_commands} class="setup-page__plans">
+          <.command_block
+            id="copy-setup-cli"
+            label="CLI setup"
+            lines={@setup_commands.cli}
+          />
+          <.command_block
+            id="copy-setup-hermes"
+            label="Hermes plugin setup"
+            lines={@setup_commands.hermes}
+          />
+        </div>
+        <p :if={!@setup_commands} class="release-state">
+          No concrete release is available to install yet.
+        </p>
+      </section>
     </Layouts.page>
     """
   end
 
-  defp instructions do
-    case Query.bootstrap_instructions() do
-      {:ok, instructions} -> instructions
-      {:error, _error} -> nil
-    end
+  defp setup_commands(%{
+         installable?: true,
+         install_argv: [_ | _] = install_argv,
+         plugin_install_argv: [_ | _] = plugin_install_argv,
+         plugin_doctor_argv: [_ | _] = plugin_doctor_argv,
+         introductory_reference: introductory_reference
+       })
+       when is_binary(introductory_reference) do
+    %{
+      cli: [
+        {:comment, @instruction},
+        {:command, install_argv},
+        {:command, ["techtree", "doctor", "--climb", introductory_reference]},
+        {:comment, @approval_boundary}
+      ],
+      hermes: [
+        {:comment, @instruction},
+        {:command, plugin_install_argv},
+        {:command, plugin_doctor_argv},
+        {:comment, "In a fresh Hermes session, enter:"},
+        {:command, ["/techtree", "setup"]},
+        {:comment, @approval_boundary}
+      ]
+    }
   end
+
+  defp setup_commands(_release), do: nil
 end

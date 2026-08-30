@@ -1,28 +1,6 @@
 defmodule TechtreeWeb.HomeLive do
   @moduledoc """
-  What Techtree is, what it produces, and how to install it — in that order.
-
-  Five regions and no more: the claim and the evidence behind it, what this
-  release is (decision 0035 — a working technical preview of a stack of three
-  independent parts, two of them other people's work), the three steps that
-  produce that evidence, the one campaign this release actually publishes, and
-  where the work goes. Nothing on this page invents activity or totals, and it
-  makes no claim about how many people have run anything.
-
-  Under the headline is the one install panel, and it holds two ways in, in
-  order. First the line a reader hands to their agent, because that is who sets
-  this up; it is copied in one action and it names no release coordinate, so it
-  is true for as long as this site is. Then, under a quiet divider, the path for
-  somebody who would rather type it: the pinned command this release publishes,
-  and the first thing to run once it has finished. Both of those come out of the
-  served release record. Neither is written into this page, and when no release
-  is being served the panel says so rather than printing a coordinate that
-  installs nothing.
-
-  Behind the headline sits one piece of decoration: the 13-block crown rendered
-  as edge-lit glass, drawn on the same ground as the page and carrying no text,
-  status or number. Decision 0039 rules it in. It rests when nobody is pointing
-  at it, and a browser that cannot draw it simply does not.
+  Why Techtree exists, followed by one copyable instruction for getting started.
   """
 
   use TechtreeWeb, :live_view
@@ -30,8 +8,6 @@ defmodule TechtreeWeb.HomeLive do
   alias Techtree.Catalog.Query
   alias TechtreeWeb.CampaignFacts
   alias TechtreeWeb.ClimbCopy
-  alias TechtreeWeb.EvidenceComponents
-  alias TechtreeWeb.EvidenceGraph
   alias TechtreeWeb.ReleaseInfo
 
   # The milestone this preview is, said once. It is not an install coordinate:
@@ -39,10 +15,8 @@ defmodule TechtreeWeb.HomeLive do
   # release below, and none of them is written into this page.
   @preview_label "Techtree v0.1 · development release"
 
-  # The line a reader hands to their agent, decided by the founder and written
-  # here once. It is an address on this site and the name of the introductory
-  # Climb — neither of which belongs to any one release — so unlike a command it
-  # is not read from the release record, and it stays true when the record moves.
+  # This names a stable page and introductory Climb rather than a release
+  # coordinate, so it remains safe to hand to an agent as the release moves.
   @agent_line "Go to techtree.sh/start and set up Techtree and run the Hello World Climb."
 
   @crown_studies [
@@ -67,9 +41,8 @@ defmodule TechtreeWeb.HomeLive do
        campaign: campaign,
        campaign_copy: campaign && ClimbCopy.for_reference(campaign.reference),
        campaign_facts: CampaignFacts.for_climb(campaign),
-       graph: EvidenceGraph.from_climb(campaign, release),
-       preview_label: @preview_label,
        release: release,
+       preview_label: @preview_label,
        crown_studies: @crown_studies,
        crown_variant: crown_variant,
        crown_study?: crown_study?
@@ -128,20 +101,20 @@ defmodule TechtreeWeb.HomeLive do
             <span class="hero-title__line">Prove it worked.</span>
           </h1>
           <p class="hero__mechanism">
-            <span>Same pinned agent. Same fixed tasks. One changed Skill.</span>
-            <span>Get a signed local receipt for the difference.</span>
+            <span>Opinionated Stack for Agent Skill Uplift.</span>
+            <span>Built on Prime Intellect and NVIDIA NeMo.</span>
           </p>
 
+          <.installer release={@release} agent_line={@agent_line} />
+
           <div class="hero__actions">
-            <.link class="button button--primary" navigate={~p"/docs#quickstart"}>
-              <span class="button__mark" aria-hidden="true"></span> Install Techtree
+            <.link class="button button--primary" navigate={~p"/start"}>
+              <span class="button__mark" aria-hidden="true"></span> Start your first Climb
             </.link>
-            <a class="text-link" href={~p"/runs"}>
-              View published runs <span aria-hidden="true">→</span>
+            <a class="text-link" href={~p"/results"}>
+              View published Results <span aria-hidden="true">→</span>
             </a>
           </div>
-
-          <.installer release={@release} agent_line={@agent_line} />
         </div>
 
         <a
@@ -159,48 +132,18 @@ defmodule TechtreeWeb.HomeLive do
       <.proof_of_concept
         class="home-section proof-of-concept"
         eyebrow="hermes + prime + nvidia agent stack"
-        title="v0.1 release - standing on giants"
+        title="v0.1 release"
         nemo_roadmap
-      >
-        <EvidenceComponents.graph
-          :if={@graph != []}
-          id="home-evidence-graph"
-          nodes={@graph}
-          compact
-        />
-      </.proof_of_concept>
-
-      <section class="home-section process" aria-labelledby="process-title">
-        <div class="section-heading">
-          <p class="eyebrow">One controlled difference</p>
-          <h2 id="process-title">Run. Improve. Prove.</h2>
-        </div>
-        <div class="process__steps">
-          <article>
-            <span>01</span>
-            <h3>Run</h3>
-            <p>Resolve a pinned campaign and record the baseline.</p>
-          </article>
-          <article>
-            <span>02</span>
-            <h3>Improve</h3>
-            <p>Change one declared Skill under a fixed budget and validation rule.</p>
-          </article>
-          <article>
-            <span>03</span>
-            <h3>Prove</h3>
-            <p>Sign the comparison, read the outcome of every task, and check the receipt offline.</p>
-          </article>
-        </div>
-      </section>
+      />
 
       <section :if={@campaign} class="home-section featured" aria-labelledby="featured-title">
         <div>
-          <p class="eyebrow">Published by this release</p>
-          <h2 id="featured-title">
-            {(@campaign_copy && @campaign_copy.campaign_title) || @campaign.title}
-          </h2>
-          <p>{@campaign.summary}</p>
+          <p class="eyebrow">Introductory Climb</p>
+          <h2 id="featured-title">{@campaign.title}</h2>
+          <p>
+            {(@campaign_copy && @campaign_copy.scope) ||
+              "A fixed comparison that changes one Skill and nothing else."}
+          </p>
         </div>
         <dl class="featured__facts">
           <div>
@@ -219,8 +162,8 @@ defmodule TechtreeWeb.HomeLive do
             <dd>{CampaignFacts.validation_words(@campaign_facts.validation) || "Not published"}</dd>
           </div>
         </dl>
-        <a class="text-link" href={~p"/campaigns/#{@campaign.projection["slug"]}"}>
-          Inspect the campaign <span aria-hidden="true">→</span>
+        <a class="text-link" href={~p"/climbs/#{@campaign.projection["slug"]}"}>
+          Inspect the Climb <span aria-hidden="true">→</span>
         </a>
       </section>
 
@@ -229,45 +172,19 @@ defmodule TechtreeWeb.HomeLive do
           <p class="eyebrow">Where the work goes</p>
           <h2 id="trust-title">Your work stays local.</h2>
         </div>
-        <div class="trust__grid">
-          <p>
-            Techtree uploads nothing unless you publish a finished run yourself. Publishing
-            uploads the complete proof bundle — its index files, signed report and receipts,
-            cited documents, and any optional execution record — while Episodes and Traces
-            remain local. The network returns a separate signed publication receipt
-            acknowledging acceptance; it is not the uploaded proof bundle. The
-            agent under test makes real model calls, and those go to the model provider
-            you selected, under that provider’s policies.
-          </p>
-          <p>
-            A result signed on your machine is internally consistent and attested by the
-            participant who produced it. Nobody else watched the run, and this site never
-            receives it.
-          </p>
-          <p class="trust__stack">
-            The agent inside the experiment is Hermes, Nous Research’s open agent, at a
-            pinned version. Every task is scored by Prime Intellect’s
-            <.verifiers_term label="Verifiers" />, pinned
-            just as exactly. Techtree fixes the conditions and signs the comparison.
-          </p>
-        </div>
+        <p class="trust__summary">
+          Techtree does not observe the Run. Your work stays local unless you choose to publish
+          the finished Result bundle. Model calls still go to the provider selected by the Climb,
+          under that provider’s policies.
+        </p>
         <p class="trust__links">
-          <a href={~p"/docs#trust"}>What leaves my machine?</a>
-          <span aria-hidden="true">·</span>
-          <a href={~p"/proofs/local"}>What a local result claims</a>
+          <a href={~p"/proofs"}>What verification establishes <span aria-hidden="true">→</span></a>
         </p>
       </section>
     </Layouts.page>
     """
   end
 
-  # The one installation on this page: two ways in, one under the other, with
-  # the agent's line first because that is who does this.
-  #
-  # The half below the divider is the released one, and it is rendered from the
-  # served release record or not rendered at all. A stand-in coordinate is
-  # release state a reader may be told about; it is never handed over as
-  # something to run.
   attr :release, :map, default: nil
   attr :agent_line, :string, required: true
 
@@ -284,46 +201,22 @@ defmodule TechtreeWeb.HomeLive do
             <p class="release-state">No release is published on this channel yet.</p>
           <% not @release.installable? -> %>
             <p class="release-state">
-              This channel publishes stand-in coordinates, so there is no command to copy
-              yet. The installation guide reads the same either way.
+              This channel publishes stand-in coordinates, so there is no command to copy yet.
             </p>
+          <% @release.introductory_reference -> %>
+            <.command_block
+              id="copy-home-cli"
+              lines={[
+                {:command, @release.install_argv},
+                {:command, ["techtree", "doctor", "--climb", @release.introductory_reference]}
+              ]}
+              label="Install, then check this machine"
+            />
           <% true -> %>
-            <.command_block
-              id="copy-home-install"
-              argv={@release.install_argv}
-              label="Install the command-line tool"
-            />
-            <.command_block
-              :if={@release.introductory_reference}
-              id="copy-home-doctor"
-              argv={["techtree", "doctor", "--climb", @release.introductory_reference]}
-              label="Then check this machine"
-            />
-            <p :if={@release.introductory_reference} class="installer__doctor-note">
-              Doctor checks prerequisites and prints the exact next action. These commands do not
-              start paid model inference.
-            </p>
-            <p class="compatibility">{hero_compatibility(@release)}</p>
-            <p class="release-coordinate">
-              <span>{ReleaseInfo.label(@release)}</span>
-              <a href={~p"/docs#release"}>Release details</a>
-            </p>
+            <p class="release-state">This release does not name an introductory Climb.</p>
         <% end %>
       </div>
     </div>
     """
-  end
-
-  defp hero_compatibility(%{minimums: minimums}) do
-    [
-      "macOS or Linux",
-      "uv required",
-      if(minimums["docker_required"], do: "Docker required"),
-      minimums["python"] && "Python #{minimums["python"]} managed by uv",
-      minimums["hermes_version"] &&
-        "Hermes #{minimums["hermes_version"]}+ only for the plugin path"
-    ]
-    |> Enum.reject(&is_nil/1)
-    |> Enum.join(" · ")
   end
 end

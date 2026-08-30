@@ -31,7 +31,6 @@ defmodule TechtreeWeb.RunsLive.Show do
   use TechtreeWeb, :live_view
 
   alias Techtree.Catalog.Query, as: Catalog
-  alias Techtree.Network.Bundle
   alias Techtree.Network.Query
   alias TechtreeWeb.CampaignFacts
   alias TechtreeWeb.ClimbCopy
@@ -48,10 +47,18 @@ defmodule TechtreeWeb.RunsLive.Show do
   end
 
   @impl true
+  def handle_event("filter_tasks", %{"filter" => filter}, socket) do
+    task_filter =
+      if filter in ~w(all better same worse), do: String.to_existing_atom(filter), else: :all
+
+    {:noreply, assign(socket, task_filter: task_filter)}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <Layouts.page wide>
-      <p class="back-link"><a href={~p"/runs"}>← Published runs</a></p>
+      <p class="back-link"><a href={~p"/results"}>← Published Results</a></p>
 
       <.warning_callout :if={@withdrawn?} title="Withdrawn by the participant">
         <p>
@@ -62,15 +69,13 @@ defmodule TechtreeWeb.RunsLive.Show do
         </p>
       </.warning_callout>
 
-      <header class="page-heading page-heading--split">
+      <header class="page-heading">
         <div>
           <p class="eyebrow">{@campaign_name} · {arrived(@entry.accepted_at)}</p>
-          <h1 id="run-comparison">{@skill_name} vs baseline</h1>
-          <p id="run-subtitle" class="run-comparison">
-            {@entry.subject_harness} {@entry.subject_harness_version} on {@entry.subject_model}
-          </p>
+          <h1 id="run-comparison">{@skill_name} vs No Skill</h1>
           <p id="run-outcome" class="lede">
-            {@entry.wins} of {@entry.task_count} tasks improved, {@entry.ties} equal, {@entry.losses} worse.
+            <strong>{result_difference(@entry)}</strong>
+            · {@entry.wins} better, {@entry.ties} same, {@entry.losses} worse.
           </p>
           <a
             :if={@github_url}
@@ -86,18 +91,18 @@ defmodule TechtreeWeb.RunsLive.Show do
             View this Skill on GitHub
           </a>
         </div>
-        <.digest value={@entry.participant_key_id} />
       </header>
 
       <section class="section">
-        <p class="eyebrow">The result</p>
+        <p class="eyebrow">The Result</p>
         <h2>What the signed summary says</h2>
         <.definition_list>
-          <:fact term="Without the Skill">{number(@entry.baseline_mean)}</:fact>
-          <:fact term="With the Skill">{number(@entry.candidate_mean)}</:fact>
-          <:fact term="Difference">{signed(@entry.absolute_delta)}</:fact>
-          <:fact term="Conclusion">{@entry.decision}</:fact>
-          <:fact term="What it may be presented as">
+          <:fact term="Without the Skill">{result_score(@entry.baseline_mean)}</:fact>
+          <:fact term="With the Skill">{result_score(@entry.candidate_mean)}</:fact>
+          <:fact term="Difference">{result_difference(@entry)}</:fact>
+          <:fact term="Conclusion">{decision_words(@entry.decision)}</:fact>
+          <:fact term="Changed Skill">{@skill_name}</:fact>
+          <:fact term="Attestation">
             {proof_grade_words(@entry.proof_grade)}
           </:fact>
         </.definition_list>
@@ -105,64 +110,77 @@ defmodule TechtreeWeb.RunsLive.Show do
 
       <section class="section">
         <p class="eyebrow">Held fixed before either run</p>
-        <h2>The coordinates this run pins</h2>
+        <h2>Comparison conditions</h2>
         <.definition_list>
-          <:fact term="Campaign">
-            <a :if={@slug} href={~p"/campaigns/#{@slug}"}>{@title}</a>
+          <:fact term="Climb">
+            <a :if={@slug} href={~p"/climbs/#{@slug}"}>{@title}</a>
             <span :if={is_nil(@slug)}>{@entry.climb_reference}</span>
           </:fact>
-          <:fact term="Campaign fingerprint">
-            <.digest
-              value={@entry.campaign_spec_digest}
-              href={object_url(@entry.campaign_spec_digest)}
-            />
-          </:fact>
           <:fact term="Tasks">
-            {CampaignFacts.membership_words(@published.membership) || "Not published"}
-          </:fact>
-          <:fact term="Task list fingerprint">
-            <.digest value={@published.membership["membership_digest"] || "Not published"} />
+            {comparison_membership_words(@published.membership)}
           </:fact>
           <:fact term="Ceiling">
             {CampaignFacts.budget_words(@published.budget) || "Not published"}
           </:fact>
-          <:fact term="Terms">
-            <.digest
-              value={@entry.data_policy_digest}
-              href={object_url(@entry.data_policy_digest)}
-            />
-          </:fact>
           <:fact term="Agent host">
             {@entry.subject_harness} {@entry.subject_harness_version}
           </:fact>
-          <:fact term="Model">{@entry.subject_model} · {@entry.subject_provider}</:fact>
-          <:fact term="Run">{@entry.run_id}</:fact>
-          <:fact term="Log sequence">{@entry.log_sequence}</:fact>
         </.definition_list>
+
+        <details class="integrity-details">
+          <summary>Integrity details</summary>
+          <.definition_list>
+            <:fact term="Climb fingerprint">
+              <.digest
+                value={@entry.campaign_spec_digest}
+                href={object_url(@entry.campaign_spec_digest)}
+              />
+            </:fact>
+            <:fact term="Task list fingerprint">
+              <.digest value={@published.membership["membership_digest"] || "Not published"} />
+            </:fact>
+            <:fact term="Terms fingerprint">
+              <.digest
+                value={@entry.data_policy_digest}
+                href={object_url(@entry.data_policy_digest)}
+              />
+            </:fact>
+            <:fact term="Skill fingerprint"><.digest value={@entry.skill_digest} /></:fact>
+            <:fact term="Model">{@entry.subject_model} · {@entry.subject_provider}</:fact>
+            <:fact term="Result ID">{@entry.run_id}</:fact>
+            <:fact term="Log sequence">{@entry.log_sequence}</:fact>
+            <:fact term="Protocol grade">{@entry.proof_grade}</:fact>
+            <:fact term="Publisher key"><.digest value={@entry.participant_key_id} /></:fact>
+          </.definition_list>
+        </details>
       </section>
 
       <section class="section">
         <p class="eyebrow">
-          {@entry.verification_checks_passed} of {@entry.verification_checks_run} passed
+          {@entry.verification_checks_run} checks passed
         </p>
-        <h2>What this site checked</h2>
-        <ul class="checks">
-          <li :for={{_name, sentence} <- @checks}>
-            <span class="checks__mark" aria-hidden="true">✓</span>
-            <span>{sentence}</span>
-          </li>
-        </ul>
-        <p class="small quiet">
-          Every one of those is a property of the bytes, and every one of them passed —
-          a receipt that does not pass all of them is never published here. None of them
-          is a claim that the run happened. This site did not watch it and has not
-          repeated it, so it remains the participant's own account of their own machine.
+        <h2>Result verification passed.</h2>
+        <p>
+          The published Result bundle passed every required check.
+          <a href={~p"/proofs"}>How verification works.</a>
         </p>
       </section>
 
       <section class="section">
         <p class="eyebrow">{@entry.task_count} tasks</p>
         <h2>Task by task</h2>
+        <div class="tasks__filters" aria-label="Filter task outcomes">
+          <button
+            :for={{filter, label, count} <- task_filters(@entry)}
+            type="button"
+            class="tasks__filter"
+            aria-pressed={to_string(@task_filter == filter)}
+            phx-click="filter_tasks"
+            phx-value-filter={filter}
+          >
+            {label} {count}
+          </button>
+        </div>
         <div class="tasks">
           <p class="tasks__row tasks__head" aria-hidden="true">
             <span>Task</span>
@@ -171,8 +189,11 @@ defmodule TechtreeWeb.RunsLive.Show do
             <span class="tasks__number">Change</span>
           </p>
           <ol>
-            <li :for={task <- @tasks} class="tasks__row">
-              <span class="tasks__task">{task.hash}</span>
+            <li :for={task <- filtered_tasks(@tasks, @task_filter)} class="tasks__row">
+              <span class="tasks__task" title={task.hash}>
+                <strong>{task.label}</strong>
+                <code>{task.short_hash}</code>
+              </span>
               <span class="tasks__number">
                 <span class="offscreen">Without the Skill</span>{task.baseline}
               </span>
@@ -190,25 +211,21 @@ defmodule TechtreeWeb.RunsLive.Show do
       <section class="offline-verify">
         <div>
           <p class="eyebrow">Check it yourself</p>
-          <h2>Nothing above was taken on trust.</h2>
+          <h2>Verify this Result offline.</h2>
           <p class="small quiet">
-            Every number here was recomputed from the bundle this run was published with,
-            and the whole of that checking can be redone on your own machine against the
-            bundle the participant holds.
-            <a href={"/api/v1/publications/" <> @entry.bundle_digest}>What this site recorded</a>
-            is the same figures again, as data.
+            <a href={"/api/v1/publications/" <> @entry.bundle_digest}>View the recorded data</a>
+            or run the verifier against a copy of the participant’s Result bundle.
           </p>
         </div>
         <.command_block
           id="copy-runs-verify"
-          argv={["techtree", "proof", "verify", @entry.run_id]}
+          argv={["techtree", "proof", "verify", "path/to/result-bundle"]}
           label="Verify offline"
         />
       </section>
 
       <p class="small quiet section">
-        <a href={~p"/runs"}>Every published run</a>
-        · <a href={~p"/proofs"}>What a finished comparison contains</a>
+        <a href={~p"/results"}>All Results</a> · <a href={~p"/proofs"}>How verification works</a>
       </p>
     </Layouts.page>
     """
@@ -221,15 +238,20 @@ defmodule TechtreeWeb.RunsLive.Show do
         {:error, _reason} -> nil
       end
 
+    skill_name = skill_name(entry, climb)
+
     %{
-      page_title: "A published run",
+      page_title: "#{skill_name} vs No Skill",
       entry: entry,
       campaign_name: campaign_name(entry, climb),
-      skill_name: skill_name(entry, climb),
+      skill_name: skill_name,
       github_url: github_url(entry),
       withdrawn?: Query.withdrawn?(entry),
-      checks: Bundle.checks(),
-      tasks: Enum.map(entry.task_deltas, &task_row/1),
+      tasks:
+        entry.task_deltas
+        |> Enum.with_index(1)
+        |> Enum.map(fn {delta, index} -> task_row(delta, index) end),
+      task_filter: :all,
       published: CampaignFacts.for_climb(climb),
       slug: climb && climb.projection["slug"],
       title: campaign_name(entry, climb)
@@ -240,8 +262,8 @@ defmodule TechtreeWeb.RunsLive.Show do
     copy = climb && ClimbCopy.for_reference(climb.reference)
 
     present(Map.get(entry, :campaign_name)) ||
-      (copy && copy.campaign_title) ||
       (climb && climb.title) ||
+      (copy && copy.campaign_title) ||
       entry.climb_reference
   end
 
@@ -270,13 +292,44 @@ defmodule TechtreeWeb.RunsLive.Show do
   # address a reader could not compare against the one they hold.
   defp object_url(digest), do: "/api/v1/objects/" <> digest
 
-  defp task_row(delta) do
+  defp task_row(delta, index) do
+    baseline = delta["baseline_reward"]
+    candidate = delta["candidate_reward"]
+
     %{
       hash: delta["task_hash"],
-      baseline: number(delta["baseline_reward"]),
-      candidate: number(delta["candidate_reward"]),
-      delta: signed(delta["candidate_reward"] - delta["baseline_reward"])
+      label: "Task " <> String.pad_leading(Integer.to_string(index), 2, "0"),
+      short_hash: short_digest(delta["task_hash"]),
+      baseline: result_score(baseline),
+      candidate: result_score(candidate),
+      delta: human_difference(candidate - baseline, baseline, candidate),
+      outcome: task_outcome(candidate, baseline)
     }
+  end
+
+  defp task_outcome(candidate, baseline) when candidate > baseline, do: :better
+  defp task_outcome(candidate, baseline) when candidate < baseline, do: :worse
+  defp task_outcome(_candidate, _baseline), do: :same
+
+  defp filtered_tasks(tasks, :all), do: tasks
+  defp filtered_tasks(tasks, outcome), do: Enum.filter(tasks, &(&1.outcome == outcome))
+
+  defp task_filters(entry) do
+    [
+      {:all, "All", entry.task_count},
+      {:better, "Better", entry.wins},
+      {:same, "Same", entry.ties},
+      {:worse, "Worse", entry.losses}
+    ]
+  end
+
+  defp comparison_membership_words(membership) do
+    membership
+    |> CampaignFacts.membership_words()
+    |> case do
+      nil -> "Not published"
+      words -> String.replace(words, "Test", "run")
+    end
   end
 
   defp number(value) when is_integer(value), do: to_string(value)
@@ -287,6 +340,40 @@ defmodule TechtreeWeb.RunsLive.Show do
 
     if rounded > 0, do: "+#{rounded}", else: to_string(rounded)
   end
+
+  defp result_score(value) when value >= 0 and value <= 1,
+    do: "#{Float.round(value * 100.0, 1)}%"
+
+  defp result_score(value), do: number(value)
+
+  defp human_difference(delta, baseline, candidate)
+       when baseline >= 0 and baseline <= 1 and candidate >= 0 and candidate <= 1 do
+    points = Float.round(delta * 100.0, 1)
+    if points > 0, do: "+#{points} pts", else: "#{points} pts"
+  end
+
+  defp human_difference(delta, _baseline, _candidate), do: signed(delta)
+
+  defp result_difference(%{
+         baseline_mean: baseline,
+         candidate_mean: candidate,
+         absolute_delta: delta
+       })
+       when baseline >= 0 and baseline <= 1 and candidate >= 0 and candidate <= 1 do
+    points = Float.round(delta * 100.0, 1)
+
+    if points > 0,
+      do: "+#{points} percentage points",
+      else: "#{points} percentage points"
+  end
+
+  defp result_difference(entry), do: signed(entry.absolute_delta)
+
+  defp short_digest("sha256:" <> digest), do: "sha256:" <> String.slice(digest, 0, 10) <> "…"
+  defp short_digest(digest), do: digest
+
+  defp decision_words("accepted"), do: "Skill accepted"
+  defp decision_words(decision), do: decision |> String.replace("_", " ") |> String.capitalize()
 
   defp arrived(at) do
     at

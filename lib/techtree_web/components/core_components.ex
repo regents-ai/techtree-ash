@@ -111,6 +111,7 @@ defmodule TechtreeWeb.CoreComponents do
   attr :class, :string, default: "section"
   attr :eyebrow, :string, default: nil
   attr :title, :string, default: "What v0.1 is"
+  attr :title_suffix, :string, default: nil
 
   attr :compact, :boolean,
     default: false,
@@ -126,7 +127,12 @@ defmodule TechtreeWeb.CoreComponents do
     <section class={@class} aria-labelledby="what-this-release-is">
       <div class="section-heading">
         <p :if={@eyebrow} class="eyebrow">{@eyebrow}</p>
-        <h2 id="what-this-release-is">{@title}</h2>
+        <h2 id="what-this-release-is">
+          {@title}
+          <%= if @title_suffix do %>
+            <span class="section-heading__nowrap">{@title_suffix}</span>
+          <% end %>
+        </h2>
       </div>
       <div class={[
         "proof-of-concept__body",
@@ -150,23 +156,26 @@ defmodule TechtreeWeb.CoreComponents do
             >
               Nous Research’s Hermes
             </a>
-            as the agent host, and Techtree as the campaign kernel and evidence layer.
-          </p>
-          <p>
-            What it demonstrates is that the three pin together tightly enough for a controlled comparison
-            to run end to end and leave a receipt that verifies
-            offline.
+            as the agent host, and Techtree as the comparison and evidence layer.
           </p>
           <p :if={@nemo_roadmap and not @compact} class="small quiet what-this-is__roadmap">
-            Support for NVIDIA’s
+            Support for NVIDIA
             <a
-              href="https://github.com/NVIDIA-NeMo"
+              href="https://github.com/NVIDIA/NeMo-Fabric"
               target="_blank"
               rel="noopener noreferrer"
             >
-              NeMo Framework
+              NeMo Fabric
             </a>
-            coming in v0.2.
+            and
+            <a
+              href="https://github.com/NVIDIA/NeMo-Relay"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              NeMo Relay
+            </a>
+            is planned for v0.2.
           </p>
         </div>
         {render_slot(@inner_block)}
@@ -182,13 +191,18 @@ defmodule TechtreeWeb.CoreComponents do
   site ever runs them: what a reader copies is what the release published, and
   where it is run is their business.
   """
-  attr :argv, :list, required: true
+  attr :argv, :list, default: nil
+
+  attr :lines, :list,
+    default: nil,
+    doc: "ordered {:command, argv} and {:comment, text} lines for one copyable shell block"
+
   attr :label, :string, default: nil
   attr :copy, :boolean, default: true
   attr :id, :string, default: nil
 
   def command_block(assigns) do
-    command = display_command(assigns.argv)
+    command = command_text(assigns)
 
     assigns =
       assigns
@@ -343,7 +357,8 @@ defmodule TechtreeWeb.CoreComponents do
     do: "Development only. Results exercise the machinery and are not evidence of anything."
 
   def proof_grade_words("P1"),
-    do: "Signed on the machine that produced it, and checkable there. Not independently repeated."
+    do:
+      "Participant-signed on the machine that produced it and internally checkable. Not independently repeated."
 
   def proof_grade_words(other), do: plain_words(other)
 
@@ -430,6 +445,20 @@ defmodule TechtreeWeb.CoreComponents do
   # Display only. An argument that would need quoting in a shell is shown
   # quoted, so that what a reader copies is what the argument list means.
   defp display_command(argv), do: Enum.map_join(argv, " ", &quote_argument/1)
+
+  defp command_text(%{argv: argv, lines: nil}) when is_list(argv),
+    do: display_command(argv)
+
+  defp command_text(%{argv: nil, lines: lines}) when is_list(lines) do
+    Enum.map_join(lines, "\n", fn
+      {:command, argv} when is_list(argv) -> display_command(argv)
+      {:comment, text} when is_binary(text) -> "# " <> text
+    end)
+  end
+
+  defp command_text(_assigns) do
+    raise ArgumentError, "command_block requires exactly one of :argv or :lines"
+  end
 
   # A stable name for the copy control, derived from what it copies, so that a
   # page holding several commands does not have to name each one by hand.

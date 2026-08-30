@@ -6,6 +6,7 @@ const MAX_DEVICE_PIXEL_RATIO = 1.5
 const MAX_DRAWING_BUFFER_PIXELS = 1_500_000
 const EASING_FRAME_LIMIT = 24
 const scriptLoads = new Map()
+const clampUnit = value => Math.min(1, Math.max(0, value))
 
 function drawingBufferSize(width, height) {
   const ratio = Math.min(MAX_DEVICE_PIXEL_RATIO, Math.max(1, window.devicePixelRatio || 1))
@@ -48,6 +49,15 @@ function loadRenderer(kind, source, module) {
   return pending
 }
 
+function opticsVariant(root, canvas) {
+  if (root.dataset.opticsKind === "crown") {
+    return `${canvas.dataset.crownVariant || ""}:${canvas.dataset.backgroundPreset || "10"}`
+  }
+  if (root.dataset.opticsKind === "background") {
+    return `${canvas.dataset.backgroundTheme || "orange"}:${canvas.dataset.backgroundPreset || "10"}`
+  }
+}
+
 export function createOpticsController(root) {
   const canvas = root.querySelector("[data-optics-canvas]")
   const viewportPointer = root.dataset.opticsPointer === "viewport"
@@ -72,6 +82,7 @@ export function createOpticsController(root) {
   let easingFrames = 0
   let confirming = false
   let release
+  let mobileAimX = 0.5
 
   const active = () => mounted && awake && onscreen && visible && !retired
 
@@ -148,6 +159,21 @@ export function createOpticsController(root) {
     if (moved && !last) schedule()
   }
 
+  const mobileCrownActive = () =>
+    root.dataset.opticsKind === "crown" && !finePointer.matches && !motion.matches
+
+  const aimCrownFromScroll = () => {
+    if (!renderer || !mobileCrownActive()) return
+
+    const bounds = canvas.getBoundingClientRect()
+    const travel = window.innerHeight + bounds.height
+    if (travel <= 0) return
+
+    renderer.aim(mobileAimX, clampUnit((window.innerHeight - bounds.top) / travel))
+    easingFrames = 0
+    invalidate()
+  }
+
   const start = async () => {
     if (starting || renderer || !active()) return
     starting = true
@@ -183,9 +209,10 @@ export function createOpticsController(root) {
       }
 
       renderer = loaded
-      rendererVariant = canvas.dataset.crownVariant
+      rendererVariant = opticsVariant(root, canvas)
       starting = false
-      invalidate()
+      if (mobileCrownActive()) aimCrownFromScroll()
+      else invalidate()
     } catch (_error) {
       if (started === generation) retire()
     }
@@ -214,15 +241,21 @@ export function createOpticsController(root) {
       sync()
     }
     const onPointerMove = event => {
-      if (!renderer || event.isPrimary === false || motion.matches || !finePointer.matches) return
+      if (!renderer || event.isPrimary === false || motion.matches) return
+
+      const touchDriven = event.pointerType === "touch" || !finePointer.matches
+      if (touchDriven && root.dataset.opticsKind !== "crown") return
+
       const bounds = canvas.getBoundingClientRect()
       const width = viewportPointer ? document.documentElement.clientWidth : bounds.width
       const left = viewportPointer ? 0 : bounds.left
       if (width <= 0 || bounds.height <= 0) return
-      renderer.aim(
-        (event.clientX - left) / width,
-        (event.clientY - bounds.top) / bounds.height,
-      )
+
+      const x = clampUnit((event.clientX - left) / width)
+      const y = clampUnit((event.clientY - bounds.top) / bounds.height)
+      if (touchDriven) mobileAimX = x
+
+      renderer.aim(x, y)
       easingFrames = 0
       invalidate()
     }
@@ -237,12 +270,24 @@ export function createOpticsController(root) {
       invalidate()
     }
     const onThemeChange = event => {
-      if (root.dataset.opticsKind !== "crown") return
-      const variant = event.detail?.crownVariant
-      if (!variant || rendererVariant === variant) return
+      const kind = root.dataset.opticsKind
+      const theme = event.detail?.theme
+      const crownVariant = event.detail?.crownVariant
+      const backgroundPreset = event.detail?.backgroundPreset || "10"
+      if (kind === "crown" && crownVariant) {
+        root.dataset.crownVariant = crownVariant
+        canvas.dataset.crownVariant = crownVariant
+      } else if (kind === "background" && theme) {
+        root.dataset.backgroundTheme = theme
+        canvas.dataset.backgroundTheme = theme
+      } else {
+        return
+      }
+      root.dataset.backgroundPreset = backgroundPreset
+      canvas.dataset.backgroundPreset = backgroundPreset
 
-      root.dataset.crownVariant = variant
-      canvas.dataset.crownVariant = variant
+      const variant = opticsVariant(root, canvas)
+      if (rendererVariant === variant) return
       retired = false
       delete root.dataset.opticsFailed
       retreat()
@@ -252,6 +297,8 @@ export function createOpticsController(root) {
     resizeObserver.observe(canvas)
     intersectionObserver.observe(root)
     document.addEventListener("visibilitychange", onVisibility)
+    window.addEventListener("scroll", aimCrownFromScroll, {passive: true})
+    pointerHost.addEventListener("pointerdown", onPointerMove, {passive: true, capture: viewportPointer})
     pointerHost.addEventListener("pointermove", onPointerMove, {passive: true, capture: viewportPointer})
     if (viewportPointer) window.addEventListener("blur", onPointerLeave)
     else pointerHost.addEventListener("pointerleave", onPointerLeave, {passive: true})
@@ -262,6 +309,8 @@ export function createOpticsController(root) {
       resizeObserver.disconnect()
       intersectionObserver.disconnect()
       document.removeEventListener("visibilitychange", onVisibility)
+      window.removeEventListener("scroll", aimCrownFromScroll)
+      pointerHost.removeEventListener("pointerdown", onPointerMove, {capture: viewportPointer})
       pointerHost.removeEventListener("pointermove", onPointerMove, {capture: viewportPointer})
       if (viewportPointer) window.removeEventListener("blur", onPointerLeave)
       else pointerHost.removeEventListener("pointerleave", onPointerLeave)

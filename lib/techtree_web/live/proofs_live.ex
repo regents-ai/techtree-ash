@@ -1,47 +1,22 @@
 defmodule TechtreeWeb.ProofsLive do
   @moduledoc """
-  What a finished comparison contains, in the coordinates this release pins.
+  A compact reference for what bundle verification establishes and what it does not.
 
-  This page exists because "view a proof" is the fair question to ask of a
-  product that sells proof, and the honest answer in this release has two
-  halves. The comparison is real and every coordinate it is pinned to is
-  published here, with an address. The result is not: nothing is uploaded to
-  this site, nothing is published from it, and so there is no participant's run
-  to show. Both halves are on the page, and neither is dressed up as the other.
-
-  What a run adds — the scores, the task-by-task record, the signature — is
-  named here as what would be there, never drawn as though it already is.
-  Founder ruling 2026-08-26: this page is deliberately short. Publishing a
-  finished run is now a thing somebody can do, and where those land is
-  `/runs`; this page stays the one curated example.
+  Published proofs live at `/results`. This secondary page explains the verifier
+  without competing with the evidence itself.
   """
 
   use TechtreeWeb, :live_view
 
-  alias Techtree.Catalog.Query
-  alias TechtreeWeb.CampaignFacts
-  alias TechtreeWeb.ClimbCopy
-  alias TechtreeWeb.EvidenceComponents
-  alias TechtreeWeb.ExampleResult
-  alias TechtreeWeb.EvidenceGraph
-  alias TechtreeWeb.ReleaseInfo
+  alias Techtree.Network.Bundle
 
   @impl true
   def mount(_params, _session, socket) do
-    campaign = Query.list_climbs() |> List.first()
-    release = ReleaseInfo.current()
-
     {:ok,
      assign(socket,
-       page_title: "A verified run",
-       campaign: campaign,
-       copy: campaign && ClimbCopy.for_reference(campaign.reference),
-       facts: (campaign && campaign.projection) || %{},
-       published: CampaignFacts.for_climb(campaign),
-       graph: EvidenceGraph.from_climb(campaign, release),
-       starter_skill: starter_skill(release),
-       example:
-         ExampleResult.for_campaign(campaign && campaign.projection["campaign_spec_digest"])
+       page_title: "How verification works",
+       checks: Bundle.checks(),
+       check_count: Bundle.check_count()
      )}
   end
 
@@ -50,141 +25,105 @@ defmodule TechtreeWeb.ProofsLive do
     ~H"""
     <Layouts.page wide>
       <header class="page-heading">
-        <p class="eyebrow">Participant-attested</p>
-        <h1>A verified run</h1>
+        <p class="eyebrow">Verifier reference</p>
+        <h1>How verification works</h1>
         <p class="lede">
-          Your agent manages the run of two Skills competing for the best score on an
-          eval in a <.verifiers_term code /> environment. The receipt of the run can be
-          optionally uploaded as proof. A later release lets other agents fork or access
-          your Skill, with USDC payment support.
+          Techtree checks a published Result bundle’s integrity, controlled comparison, score
+          consistency, and publication policy. Verification makes the bundle internally
+          checkable; it is not independent observation of the run.
         </p>
       </header>
 
-      <.proof_of_concept class="doc-section" compact />
+      <section id="local-results" class="boundary section" aria-label="Verification boundary">
+        <div class="boundary__side">
+          <p class="boundary__title">What Techtree verifies</p>
+          <h2>Internally checkable evidence</h2>
+          <ul class="verification-summary">
+            <li><strong>Integrity.</strong> Stored files match their digests and signatures.</li>
+            <li>
+              <strong>Controlled comparison.</strong> Both branches use the same published Climb
+              and ordered tasks, with only the permitted Skill changed.
+            </li>
+            <li>
+              <strong>Score consistency.</strong> The summary recomputes from task-level results.
+            </li>
+            <li>
+              <strong>Publication policy.</strong> The bundle contains no episodes, transcripts,
+              or machine-local paths.
+            </li>
+          </ul>
+        </div>
+        <div class="boundary__side">
+          <p class="boundary__title">What remains unproven</p>
+          <h2>Verification is not observation</h2>
+          <ul class="verification-summary">
+            <li>The site did not witness the execution.</li>
+            <li>The participant’s machine is not independently attested.</li>
+            <li>The result does not establish generalization beyond the Climb.</li>
+            <li>Nobody else reproduced it unless a separate reproduction says so.</li>
+          </ul>
+        </div>
+      </section>
 
-      <section :if={@example} class="example-result" aria-labelledby="example-title">
-        <p class="eyebrow">Participant-attested · certified {@example.certified_on}</p>
-        <h2 id="example-title">Example Baseline vs. Instructional Skill</h2>
+      <section id="comparison" class="doc-section section">
+        <p class="eyebrow">Method</p>
+        <h2>The controlled comparison</h2>
+        <p>Techtree runs the same fixed tasks twice.</p>
         <p>
-          One comparison from the v0.1 certification, shown in full. The tasks are
-          synthetic and were built to demonstrate the mechanism, so a good score here
-          says nothing about how an agent performs on real work, and neither does a
-          poor one. Nobody outside this project has reproduced it.
+          The model stays the same. The
+          <a href="https://github.com/NousResearch/hermes-agent">Hermes</a>
+          harness stays the same. The runtime, tools, scorer, task membership, sampling, and
+          budget stay the same. Only the Skill may change.
         </p>
-        <.definition_list>
-          <:fact term="Without the Skill">
-            {@example.baseline_total} of {@example.tasks} tasks
-          </:fact>
-          <:fact term="With the Skill">
-            {@example.candidate_total} of {@example.tasks} tasks
-          </:fact>
-          <:fact term="Task by task">
-            {@example.wins} wins · {@example.ties} ties · {@example.losses} losses
-          </:fact>
-          <:fact term="Decision">{@example.decision}</:fact>
-          <:fact term="Signed report">
-            <.digest value={@example.file_digest} />
-          </:fact>
-        </.definition_list>
-        <p class="small quiet">
-          Measured on the founder's machine during v0.1 certification, run {@example.run_id}. Publishing your own result here arrives in a later
-          release.
+        <pre class="docs-code"><code>Same agent
+    Same tasks
+    Same evaluation
+
+    Skill v1 → Skill v2</code></pre>
+        <p>
+          Prime Intellect’s <a href="https://github.com/PrimeIntellect-ai/verifiers">Verifiers</a>
+          library runs and scores the tasks. Techtree checks that the comparison stayed
+          controlled and packages the Result into a signed proof bundle.
+        </p>
+        <p>
+          The Result may be an uplift, a tie, a regression, a failed Run, or an invalid
+          comparison. Techtree does not turn every attempt into a success.
         </p>
       </section>
 
-      <.warning_callout
-        :if={is_nil(@example)}
-        title="No participant result is published here"
-        attention
-      >
-        <p>
-          A finished run stays on the machine that produced it unless its owner chooses
-          to publish it. Where published runs land is <.link navigate={~p"/runs"}>the run log</.link>.
-        </p>
-      </.warning_callout>
+      <section class="offline-verify">
+        <div>
+          <p class="eyebrow">Check it yourself</p>
+          <h2>Verify a Result offline.</h2>
+          <p class="small quiet">
+            Anyone holding the participant’s bundle can run the same verifier on their own
+            machine.
+          </p>
+        </div>
+        <.command_block
+          id="copy-proof-verify"
+          argv={["techtree", "proof", "verify", "path/to/result-bundle"]}
+          label="Verify offline"
+        />
+      </section>
 
-      <p :if={is_nil(@campaign)} class="empty-state section">
-        No campaign is published on this channel, so there are no coordinates to show.
+      <section class="integrity-details section" id="verifier-checks">
+        <h2>The offline verifier currently performs {@check_count} checks</h2>
+        <ol class="checks">
+          <li :for={{_name, words} <- @checks}>{words}</li>
+        </ol>
+      </section>
+
+      <p class="small quiet section">
+        For detailed information, read the <a href={~p"/docs#method"}>Docs</a>, copyable as
+        Markdown to your agent.
       </p>
 
-      <div :if={@campaign}>
-        <EvidenceComponents.graph id="proof-evidence-graph" nodes={@graph} />
-
-        <section class="doc-section">
-          <p class="eyebrow">Held fixed</p>
-          <h2>The comparison</h2>
-          <.definition_list>
-            <:fact term="Campaign">
-              <a href={~p"/campaigns/#{@facts["slug"]}"}>
-                {(@copy && @copy.campaign_title) || @campaign.title}
-              </a>
-            </:fact>
-            <:fact term="Fingerprint">
-              <.digest
-                value={@facts["campaign_spec_digest"]}
-                href={object_url(@facts["campaign_spec_digest"])}
-              />
-            </:fact>
-            <:fact term="Tasks">
-              {CampaignFacts.membership_words(@published.membership) || "Not published"}
-            </:fact>
-            <:fact term="Subject">
-              {@facts["subject_harness"]} {@facts["subject_harness_version"]} · {model_coordinate(
-                @facts["subject_model"]
-              )}
-            </:fact>
-            <:fact term="Scored by">Prime Intellect’s Verifiers, at a pinned version</:fact>
-            <:fact term="Ceiling">
-              {CampaignFacts.budget_words(@published.budget) || "Not published"}
-            </:fact>
-            <:fact term="The one change">
-              One Skill, mounted in the candidate and absent from the baseline.
-              <span :if={@starter_skill}>Starts from {@starter_skill["name"]}:</span>
-              <.digest :if={@starter_skill} value={@starter_skill["tree_digest"]} />
-            </:fact>
-          </.definition_list>
-        </section>
-
-        <section class="offline-verify">
-          <div>
-            <p class="eyebrow">What a run adds</p>
-            <h2>Scores, every task’s outcome, and a signed bundle.</h2>
-            <p class="small quiet">
-              Only a run carries those. The bundle is signed on the machine that
-              produced it, and anyone holding a copy can check it on their own
-              machine, offline.
-            </p>
-          </div>
-          <.command_block
-            id="copy-proof-verify"
-            argv={["techtree", "proof", "verify", "path/to/result-bundle"]}
-            label="Verify offline"
-          />
-        </section>
-
-        <p class="small quiet section">
-          <a href={~p"/campaigns/#{@facts["slug"]}"}>The campaign behind it</a>
-          · <a href={~p"/docs#proof-limits"}>What verification checks</a>
-        </p>
-      </div>
+      <p class="small quiet section">
+        <a href={~p"/results"}>Browse Results</a>
+        · <a href={~p"/docs#verify"}>Operate the verifier</a>
+      </p>
     </Layouts.page>
     """
   end
-
-  defp starter_skill(%{starter_skill: %{"name" => name, "tree_digest" => digest} = skill})
-       when is_binary(name) and is_binary(digest),
-       do: skill
-
-  defp starter_skill(_release), do: nil
-
-  defp model_coordinate(model) when is_map(model) do
-    [model["provider"], model["model_id"], model["revision"]]
-    |> Enum.reject(&(&1 in [nil, ""]))
-    |> Enum.join(" · ")
-  end
-
-  defp model_coordinate(_model), do: "Not published"
-
-  defp object_url(digest) when is_binary(digest), do: "/api/v1/objects/" <> digest
-  defp object_url(_digest), do: nil
 end

@@ -1,13 +1,87 @@
 // The pages are read-only documents. This bundle keeps the live connection,
 // copies published commands, remembers the reader's color preference, and
-// draws the crown behind the headline. It never runs a command or sends the
-// preference anywhere.
+// draws the crown behind the headline, and reads the repository's public star
+// count. It never runs a command or sends the color preference anywhere.
 
 import "phoenix_html"
 import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 
-import {Optics} from "./optics_controller"
+import {Optics, createOpticsController} from "./optics_controller"
+
+const GITHUB_STAR_CACHE = "techtree-github-stars"
+const GITHUB_STAR_REFRESH_MS = 2 * 60 * 1000
+const githubStarFormatter = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  compactDisplay: "short",
+  maximumFractionDigits: 1,
+})
+
+function formatGitHubStars(count) {
+  if (count < 1000) return count.toLocaleString("en-US")
+
+  return githubStarFormatter
+    .format(count)
+    .replace(/[KMBT]$/, suffix => suffix.toLowerCase())
+}
+
+function showGitHubStars(count) {
+  if (!Number.isInteger(count) || count < 0) return
+
+  document.querySelectorAll("[data-github-stars]").forEach(node => {
+    node.textContent = formatGitHubStars(count)
+  })
+
+  document.querySelectorAll("[data-github-stars-link]").forEach(link => {
+    const noun = count === 1 ? "star" : "stars"
+    const exactCount = count.toLocaleString("en-US")
+    link.setAttribute("aria-label", `regents-ai/techtree on GitHub, ${exactCount} ${noun}`)
+  })
+}
+
+async function syncGitHubStars() {
+  let cached
+
+  try {
+    cached = JSON.parse(window.sessionStorage.getItem(GITHUB_STAR_CACHE))
+  } catch (_error) {
+    cached = null
+  }
+
+  if (Number.isInteger(cached)) {
+    showGitHubStars(cached)
+  }
+
+  const link = document.querySelector("[data-github-stars-link]")
+  const repository = link?.dataset.githubRepository
+  if (!repository) return
+
+  try {
+    const response = await fetch(`https://api.github.com/repos/${repository}`, {
+      headers: {Accept: "application/vnd.github+json"},
+      cache: "no-store",
+    })
+
+    if (!response.ok) return
+    const payload = await response.json()
+    const count = payload.stargazers_count
+    if (!Number.isInteger(count)) return
+
+    try {
+      window.sessionStorage.setItem(GITHUB_STAR_CACHE, JSON.stringify(count))
+    } catch (_error) {
+      // The public count can still render when storage is unavailable.
+    }
+
+    showGitHubStars(count)
+  } catch (_error) {
+    // Keep the server-rendered fallback when GitHub is unavailable.
+  }
+}
+
+syncGitHubStars()
+const githubStarRefresh = window.setInterval(syncGitHubStars, GITHUB_STAR_REFRESH_MS)
+window.addEventListener("pagehide", () => window.clearInterval(githubStarRefresh), {once: true})
 
 const THEME_COOKIE = "techtree_theme"
 const THEME_MAX_AGE = 60 * 60 * 24 * 365
@@ -25,8 +99,6 @@ const THEMES = {
     browserColor: "#101010",
   },
 }
-const systemTheme = window.matchMedia("(prefers-color-scheme: light)")
-
 function readThemeCookie() {
   const prefix = `${THEME_COOKIE}=`
   const value = document.cookie
@@ -45,7 +117,7 @@ function writeThemeCookie(theme) {
 
 let savedTheme = readThemeCookie()
 
-const resolvedTheme = () => savedTheme || (systemTheme.matches ? "orange" : "titanium")
+const resolvedTheme = () => savedTheme || "orange"
 
 function previewRouteTheme() {
   if (/^\/crown\/2\/?$/.test(window.location.pathname)) return "orange"
@@ -74,24 +146,38 @@ function syncThemeControl(theme) {
 
 function syncCrownTheme(theme) {
   const variant = THEMES[theme].crownVariant
-  let changed = false
 
   document.querySelectorAll('[data-optics-kind="crown"]').forEach(root => {
     if (root.dataset.crownThemeControlled !== "true") return
 
     const canvas = root.querySelector("[data-optics-canvas]")
     const hero = root.closest(".hero")
-    changed ||= root.dataset.crownVariant !== variant || canvas?.dataset.crownVariant !== variant
     root.dataset.crownVariant = variant
     if (canvas) canvas.dataset.crownVariant = variant
     if (hero) hero.dataset.crownVariant = variant
   })
 
-  if (changed) {
-    document.dispatchEvent(new CustomEvent("techtree:themechange", {
-      detail: {theme, crownVariant: variant},
-    }))
-  }
+}
+
+function requestedBackgroundPreset() {
+  const value = new URLSearchParams(window.location.search).get("bg") || "10"
+  return /^(?:[1-9]|10)$/.test(value) ? value : "10"
+}
+
+function syncBackground(theme) {
+  const preset = requestedBackgroundPreset()
+
+  document.querySelectorAll("[data-optics-kind]").forEach(root => {
+    const canvas = root.querySelector("[data-optics-canvas]")
+    root.dataset.backgroundPreset = preset
+    if (canvas) canvas.dataset.backgroundPreset = preset
+
+    if (root.dataset.opticsKind !== "background") return
+    root.dataset.backgroundTheme = theme
+    if (canvas) canvas.dataset.backgroundTheme = theme
+  })
+
+  return preset
 }
 
 function applyTheme(theme) {
@@ -100,6 +186,10 @@ function applyTheme(theme) {
   document.querySelector("meta[name='theme-color']")?.setAttribute("content", selected.browserColor)
   syncThemeControl(theme)
   syncCrownTheme(theme)
+  const backgroundPreset = syncBackground(theme)
+  document.dispatchEvent(new CustomEvent("techtree:themechange", {
+    detail: {theme, crownVariant: selected.crownVariant, backgroundPreset},
+  }))
 }
 
 document.addEventListener("click", event => {
@@ -112,12 +202,13 @@ document.addEventListener("click", event => {
   applyTheme(theme)
 })
 
-systemTheme.addEventListener("change", () => {
-  if (!savedTheme && !previewRouteTheme()) applyTheme(pageTheme())
-})
-
 window.addEventListener("phx:page-loading-stop", () => applyTheme(pageTheme()))
 applyTheme(pageTheme())
+
+const siteBackground = document.querySelector("#site-background")
+const siteBackgroundController = siteBackground && createOpticsController(siteBackground)
+siteBackgroundController?.mount()
+window.addEventListener("pagehide", () => siteBackgroundController?.destroy(), {once: true})
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 
@@ -127,9 +218,11 @@ Hooks.CopyCommand = {
   mounted() {
     this.el.addEventListener("click", async () => {
       const label = this.el.querySelector("[data-copy-label]")
+      const visibleCopy = this.el.closest(".command")?.querySelector(".command__block")
+      const copyValue = visibleCopy?.textContent ?? this.el.dataset.copyValue
 
       try {
-        await navigator.clipboard.writeText(this.el.dataset.copyValue)
+        await navigator.clipboard.writeText(copyValue)
         label.textContent = "Copied"
         this.el.classList.add("is-copied")
 
@@ -166,7 +259,7 @@ function pageAsMarkdown(root) {
           out += "`" + text(child) + "`"
         } else if (tag === "a") {
           const href = child.getAttribute("href") || ""
-          const absolute = href.startsWith("http") ? href : window.location.origin + href
+          const absolute = new URL(href, window.location.href).href
           out += "[" + text(child) + "](" + absolute + ")"
         } else if (tag === "strong" || tag === "b") {
           out += "**" + text(child) + "**"
@@ -216,7 +309,7 @@ function pageAsMarkdown(root) {
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n"
 }
 
-const docsRoot = () => document.querySelector("main")
+const docsRoot = () => document.querySelector("[data-markdown-root]") ?? document.querySelector("main")
 
 Hooks.CopyCommandPage = {
   mounted() {

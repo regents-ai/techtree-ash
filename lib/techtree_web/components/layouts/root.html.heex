@@ -4,7 +4,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
-    <meta name="color-scheme" content="dark light" />
+    <meta name="techtree-revision" content={Techtree.BuildInfo.source_revision()} />
+    <meta
+      name="color-scheme"
+      content={if(assigns[:theme] == "orange", do: "light", else: "dark")}
+    />
     <meta
       id="theme-color"
       name="theme-color"
@@ -12,7 +16,7 @@
     />
     <meta
       name="description"
-      content="Improve a Skill under controlled conditions and produce a checkable local result."
+      content={page_description(assigns)}
     />
     <.live_title default="Techtree" suffix=" · Techtree">
       {assigns[:page_title]}
@@ -32,7 +36,29 @@
     </script>
   </head>
   <body>
-    <.masthead :if={masthead_visible?(assigns)} current_path={request_path(assigns)} />
+    <div
+      id="site-background"
+      class="site-background"
+      data-optics-kind="background"
+      data-optics-source={~p"/assets/js/background_island.js"}
+      data-background-theme={assigns[:theme]}
+      data-background-preset="10"
+      aria-hidden="true"
+    >
+      <canvas
+        id="site-background-canvas"
+        class="site-background__canvas"
+        data-optics-canvas
+        data-background-theme={assigns[:theme]}
+        data-background-preset="10"
+      >
+      </canvas>
+    </div>
+    <.masthead
+      :if={masthead_visible?(assigns)}
+      current_path={request_path(assigns)}
+      theme={assigns[:theme] || "orange"}
+    />
     {@inner_content}
   </body>
 </html>
